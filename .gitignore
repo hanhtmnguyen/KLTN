@@ -1,0 +1,36 @@
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data and large files (Do not push these to GitHub!)
+data/
+test_download/
+logs/
+*.h5
+*.tif
+*.nc
+*.zip
+*.tar.gz
+
+# You may want to keep the bound/ folder if the shapefiles are small and needed to run the code.
+# The current shapefiles in bound/ are ~1.8MB which is fine for GitHub.

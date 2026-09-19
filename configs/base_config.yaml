@@ -1,0 +1,75 @@
+# ==============================================================================
+# PI-GAN Flood Super-Resolution Pipeline — Base Configuration
+# ==============================================================================
+
+study_area:
+  name: "Red River Hanoi"
+  # Bounding box [west, south, east, north] in EPSG:4326
+  bbox: [105.3065, 20.6888, 106.0160, 21.3427]
+  crs_geographic: "EPSG:4326"
+  crs_projected: "EPSG:32648"  # UTM Zone 48N
+
+resolutions:
+  coarse: 30   # meters (HAND input / FabDEM native)
+  fine: 10     # meters (target resolution for DTM and flood maps)
+
+data_sources:
+  icesat2:
+    product: "ATL03"
+    date_ranges:
+      - ["2018-01-01", "2018-12-31"]
+      - ["2023-09-08", "2025-12-31"]
+    confidence_threshold: 3  # minimum signal_conf_ph for ground photons
+  sentinel2:
+    collection: "COPERNICUS/S2_SR_HARMONIZED"
+    bands: ["B2", "B3", "B4", "B8"]
+    max_cloud_cover: 10  # percent
+  sentinel1:
+    collection: "COPERNICUS/S1_GRD"
+    polarization: "VV"
+    orbit: "DESCENDING"
+  fabdem:
+    source: "fabdem"  # Python package
+  osm:
+    tags:
+      building: true
+
+# Manning's n roughness coefficients
+mannings_n:
+  open_water: 0.030
+  floodplain_bare: 0.035
+  floodplain_vegetated: 0.050
+  light_residential: 0.080
+  dense_residential: 0.100
+  commercial_industrial: 0.120
+  building_blocked: 0.150
+
+# Gauge stations along the Red River (lon, lat)
+gauge_stations:
+  son_tay:
+    name: "Son Tay"
+    lon: 105.5044
+    lat: 21.1417
+    role: "upstream_boundary"
+  hanoi:
+    name: "Hanoi (Long Bien)"
+    lon: 105.8572
+    lat: 21.0425
+    role: "calibration"
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  training: "data/training"
+  models: "models"
+  outputs: "outputs"
+  logs: "logs"
+
+# Google Earth Engine Cloud Project ID
+# Register at: https://console.cloud.google.com/earth-engine/configuration
+ee_project: "ee-23001459"
+
+# Physical constants
+physics:
+  gravity: 9.81  # m/s^2
+  water_density: 1000  # kg/m^3

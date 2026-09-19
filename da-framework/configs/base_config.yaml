@@ -1,0 +1,139 @@
+# ==============================================================================
+# GeoAI DEM Correction & Flood Impact Assessment — Base Configuration
+# ==============================================================================
+
+study_area:
+  name: "Red River Hanoi"
+  # Bounding box [west, south, east, north] in EPSG:4326
+  bbox: [105.7, 20.9, 106.0, 21.2]
+  crs_geographic: "EPSG:4326"
+  crs_projected: "EPSG:32648"  # UTM Zone 48N
+
+resolutions:
+  coarse: 30   # meters (FabDEM native resolution)
+  fine: 10     # meters (target DTM and flood map resolution)
+
+data_sources:
+  icesat2:
+    products: ["ATL03", "ATL08"]
+    date_range: ["2019-01-01", "2024-12-31"]
+    quality_flags:
+      snr_min: 10
+      cloud_flag_atm_max: 2
+      msw_flag_max: 3
+  sentinel2:
+    collection: "COPERNICUS/S2_SR_HARMONIZED"
+    bands: ["B2", "B3", "B4", "B8", "B11"]   # B11 (SWIR1, 20m) added for MNDWI
+    max_cloud_cover: 10  # percent
+  sentinel1:
+    collection: "COPERNICUS/S1_GRD"
+    polarization: "VV"
+    orbit: "DESCENDING"
+  fabdem:
+    source: "fabdem"  # Python package
+
+# Manning's n roughness coefficients
+mannings_n:
+  open_water: 0.030
+  floodplain_bare: 0.035
+  floodplain_vegetated: 0.050
+  light_residential: 0.080
+  dense_residential: 0.100
+  commercial_industrial: 0.120
+  building_blocked: 0.150
+
+# Gauge stations along the Red River (lon, lat)
+gauge_stations:
+  son_tay:
+    name: "Son Tay"
+    lon: 105.5044
+    lat: 21.1417
+    role: "upstream_boundary"
+  hanoi:
+    name: "Hanoi (Long Bien)"
+    lon: 105.8572
+    lat: 21.0425
+    role: "calibration"
+
+# --------------------------------------------------------------------------
+# ANN DEM Corrector (Residual MLP — Model B)
+# --------------------------------------------------------------------------
+ann_dtm:
+  input_features:
+    - "B2"
+    - "B3"
+    - "B4"
+    - "B8"
+    - "NDVI"
+    - "MNDWI"
+    - "fabdem_elev"
+    - "slope"
+    - "aspect"
+    - "dist2river"
+  architecture:
+    hidden_layers: [256, 128, 64, 32]
+    dropout: [0.3, 0.2, 0.1, 0.0]
+  training:
+    epochs: 300
+    batch_size: 256
+    learning_rate: 0.001
+    patience: 25
+    val_fraction: 0.15
+    test_fraction: 0.15
+    loss: "huber"         # SmoothL1Loss (Huber)
+    residual_learning: true  # ΔH = FabDEM - ICESat2
+    outlier_threshold_m: 25  # |H_FabDEM - H_ICESat2| >= 25m -> drop
+
+# --------------------------------------------------------------------------
+# Tree-Based DEM Corrector (XGBoost / LightGBM — Model C)
+# --------------------------------------------------------------------------
+tree_model:
+  backend: "xgboost"       # "xgboost" or "lightgbm"
+  params:
+    n_estimators: 500
+    max_depth: 8
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 5
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+  residual_learning: true
+
+# --------------------------------------------------------------------------
+# HAND Flood Simulation
+# --------------------------------------------------------------------------
+flood_simulation:
+  # Physical stream initiation threshold (km²)
+  stream_initiation_threshold_km2: 3.5
+  # HAND thresholds for multi-level inundation maps (metres)
+  hand_thresholds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# --------------------------------------------------------------------------
+# Spatial Cross-Validation
+# --------------------------------------------------------------------------
+spatial_cv:
+  method: "group_kfold"   # GroupKFold by ICESat-2 track_id
+  n_splits: 5
+
+# --------------------------------------------------------------------------
+# Cascading Impact Evaluation
+# --------------------------------------------------------------------------
+evaluation:
+  depth_threshold: 0.05   # minimum depth (m) to count as "wet"
+  stratification:
+    floodplain_dist_m: 1200     # distance to river threshold
+    slope_threshold_deg: 2.0    # flat vs sloped terrain
+
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  training: "data/training"
+  models: "models"
+  outputs: "outputs"
+  logs: "logs"
+
+# Physical constants
+physics:
+  gravity: 9.81  # m/s^2
+  water_density: 1000  # kg/m^3
